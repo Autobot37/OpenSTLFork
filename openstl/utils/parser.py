@@ -30,7 +30,7 @@ def create_parser():
     parser.add_argument('--num_workers', default=4, type=int)
     parser.add_argument('--data_root', default='./data')
     parser.add_argument('--dataname', '-d', default='mmnist', type=str,
-                        choices=['bair', 'mfmnist', 'mmnist', 'mmnist_cifar', 'noisymmnist', 'taxibj', 'human',
+                        choices=['nonlinearmmnist', 'bair', 'mfmnist', 'mmnist', 'mmnist_cifar', 'noisymmnist', 'taxibj', 'human',
                                 'kth', 'kth20', 'kth40', 'kitticaltech', 'kinetics', 'kinetics400', 'kinetics600',
                                 'weather', 'weather_t2m_5_625', 'weather_mv_4_28_s6_5_625', 'weather_mv_4_4_s6_5_625',
                                 'weather_r_5_625', 'weather_uv10_5_625', 'weather_tcc_5_625', 'weather_t2m_1_40625',
@@ -46,6 +46,31 @@ def create_parser():
                         help='Whether to use prefetcher for faster data loading')
     parser.add_argument('--drop_last', action='store_true', default=False,
                         help='Whether to drop the last batch in the val data loading')
+    parser.add_argument('--noise_type', default='perceptual', type=str,
+                    choices=['perceptual', 'missing', 'dynamic'],
+                    help='Noise type for noisymmnist')
+    parser.add_argument(
+        "--in_shape",
+        nargs=4,
+        type=int,
+        default=[10, 1, 64, 64],
+        metavar=("T", "C", "H", "W"),
+        help="Input shape as 4 ints: T C H W"
+    )
+    parser.add_argument(
+        "--limit_train_batches",
+        type=float,
+        default=1.0,
+        help="Fraction (0..1] or int (#batches) for train loader per epoch. Default: 1.0 (all).",
+    )
+
+    parser.add_argument(
+        "--limit_test_batches",
+        type=float,
+        default=1.0,
+        help="Fraction (0..1] or int (#batches) for test loader. Default: 1.0 (all).",
+    )
+
 
     # method parameters
     parser.add_argument('--method', '-m', default='SimVP', type=str,

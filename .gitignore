@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
+
 # Distribution / packaging
 .Python
 build/
@@ -124,7 +125,7 @@ lightning_logs/
 
 # Pytorch
 *.pth
-
+*.ckpt
 *.swp
 .DS_Store
 *.json
@@ -139,3 +140,6 @@ configs_test/
 api/test.py
 configs/kinetics/simvp
 configs/bair/simvp
+
+*.gif
+*.png

@@ -4,6 +4,7 @@ import random
 
 from openstl.datasets.utils import create_loader
 from openstl.datasets.dataloader_moving_mnist import MovingMNIST
+from openstl.datasets.dataloader_moving_mnist import load_mnist
 
 
 class NoisyMovingMNIST(MovingMNIST):
@@ -19,13 +20,18 @@ class NoisyMovingMNIST(MovingMNIST):
         num_objects (list): The number of moving objects in videos.
         use_augment (bool): Whether to use augmentations (defaults to False).
     """
-    def __init__(self, root, is_train=True, data_name='mnist', n_frames_input=10, n_frames_output=10, image_size=64, num_objects=..., sigma=0.2, mis_prob=0.2, noise_type='perceptual', transform=None, use_augment=False):
+    def __init__(self, root, is_train=True, data_name='mnist', n_frames_input=10, n_frames_output=10, image_size=64, num_objects=..., sigma=0.2, mis_prob=0.25, noise_type='perceptual', transform=None, use_augment=False):
         # only support mnist
         data_name = 'mnist'
         self.sigma = sigma
         self.mis_prob = mis_prob
         self.noise_type = noise_type
         MovingMNIST.__init__(self, root, is_train, data_name, n_frames_input, n_frames_output, image_size, num_objects, transform, use_augment)
+        if not is_train:
+            # DO NOT use fixed test set; we need on-the-fly generation so noise applies
+            self.dataset = None
+            self.mnist = load_mnist(root, "mnist")   # ensure digits are available
+            self.length = int(1e4)
 
     def get_random_trajectory(self, seq_length):
         ''' Generate a random sequence of a MNIST digit '''
@@ -108,9 +114,14 @@ class NoisyMovingMNIST(MovingMNIST):
                 pos_y = np.random.randint(0, self.image_size_ - 24)
                 data[i, pos_x:pos_x+24, pos_y:pos_y+24] = 0
         elif self.noise_type == 'missing':
-            mis_idx = np.random.choice([0, 1], size=self.n_frames_input, p=[1-self.mis_prob, self.mis_prob])
-            mis_idx = np.where(mis_idx == 1)[0]
-            data[:self.n_frames_input][mis_idx] = 0
+            mis_mask = np.random.choice(
+                [0, 1],
+                size=self.n_frames_input,
+                p=[1 - self.mis_prob, self.mis_prob]
+            )
+            mis_idx = np.where(mis_mask == 1)[0]
+            data[mis_idx, :, :] = 0
+
 
         data = data[..., np.newaxis]
         return data
@@ -125,10 +136,13 @@ def load_data(batch_size, val_batch_size, data_root, num_workers=4, data_name='m
                             n_frames_input=pre_seq_length,
                             n_frames_output=aft_seq_length, num_objects=[2],
                             image_size=image_size, use_augment=use_augment, noise_type=noise_type)
-    test_set = NoisyMovingMNIST(root=data_root, is_train=False, data_name=data_name,
-                           n_frames_input=pre_seq_length,
-                           n_frames_output=aft_seq_length, num_objects=[2],
-                           image_size=image_size, use_augment=False)
+    test_set = NoisyMovingMNIST(
+        root=data_root, is_train=False, data_name=data_name,
+        n_frames_input=pre_seq_length,
+        n_frames_output=aft_seq_length, num_objects=[2],
+        image_size=image_size, use_augment=False,
+        noise_type=noise_type,           # <-- ADD THIS
+    )
 
     dataloader_train = create_loader(train_set,
                                      batch_size=batch_size,

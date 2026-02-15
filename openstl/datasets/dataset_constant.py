@@ -22,6 +22,14 @@ dataset_parameters = {
         'data_name': 'mnist',
         'metrics': ['mse', 'mae', 'ssim', 'psnr'],
     },
+    'nonlinearmmnist': {
+        'in_shape': [10, 1, 64, 64],
+        'pre_seq_length': 10,
+        'aft_seq_length': 10,
+        'total_length': 20,
+        'data_name': 'mnist',
+        'metrics': ['mse', 'mae', 'ssim', 'psnr'],
+    },
     'mmnist_cifar': {
         'in_shape': [10, 3, 64, 64],
         'pre_seq_length': 10,

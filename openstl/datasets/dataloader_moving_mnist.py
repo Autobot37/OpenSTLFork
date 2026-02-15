@@ -78,11 +78,17 @@ class MovingMNIST(Dataset):
             self.mnist = load_mnist(root, data_name)
             self.cifar = load_cifar(root, data_name)
         else:
-            if num_objects[0] != 2:
+            total_len = n_frames_input + n_frames_output  # requested total sequence length
+
+            # fixed test set exists only for the standard length (20)
+            if (num_objects[0] == 2) and (total_len == 20):
+                self.dataset = load_fixed_set(root, data_name)
+            else:
+                # generate on the fly for any other length (e.g., 60 = 10 + 50)
                 self.mnist = load_mnist(root, data_name)
                 self.cifar = load_cifar(root, data_name)
-            else:
-                self.dataset = load_fixed_set(root, data_name)
+                self.dataset = None
+
         self.length = int(1e4) if self.dataset is None else self.dataset.shape[1]
 
         self.num_objects = num_objects
@@ -199,14 +205,12 @@ class MovingMNIST(Dataset):
 
     def __getitem__(self, idx):
         length = self.n_frames_input + self.n_frames_output
-        if self.is_train or self.num_objects[0] != 2:
-            # Sample number of objects
+        if self.is_train or self.num_objects[0] != 2 or (self.dataset is None):
             num_digits = random.choice(self.num_objects)
-            # Generate data on the fly
             images = self.generate_moving_mnist(num_digits, self.background)
         else:
             images = self.dataset[:, idx, ...]
-
+        
         if not self.background:
             r, w = 1, self.image_size_
             images = images.reshape((length, w, r, w, r)).transpose(

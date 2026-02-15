@@ -82,9 +82,10 @@ def check_dir(path):
 def get_dataset(dataname, config):
     from openstl.datasets import dataset_parameters
     from openstl.datasets import load_data
-    config.update(dataset_parameters[dataname])
-    return load_data(**config)
 
+    cfg = dict(dataset_parameters[dataname])  # start from defaults
+    cfg.update(config)                        # then override with user config
+    return load_data(**cfg)
 
 def measure_throughput(model, input_dummy):
 

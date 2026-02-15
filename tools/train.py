@@ -29,6 +29,8 @@ if __name__ == '__main__':
                 config[attribute] = default_values[attribute]
 
     print('>'*35 + ' training ' + '<'*35)
+    args.metrics = ['mse', 'mae', 'psnr', 'ssim']
+    args.in_shape = [10, 1, 64, 64]
     exp = BaseExperiment(args)
     rank, _ = get_dist_info()
     exp.train()

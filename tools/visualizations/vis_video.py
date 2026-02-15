@@ -49,7 +49,7 @@ def main():
         method_list = [args.work_dirs.split('/')[-1]]
         base_dir = base_dir.split(method_list[0])[0]
 
-    use_rgb = False if args.dataname in ['mfmnist', 'mmnist', 'kth20', 'kth', 'kth40'] else True
+    use_rgb = False if args.dataname in ['mfmnist', 'mmnist', 'noisymnist', 'kth20', 'kth', 'kth40'] else True
     config = args.__dict__
     config.update(dataset_parameters[args.dataname])
     idx, ncols = args.index, config['aft_seq_length']

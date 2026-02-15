@@ -101,75 +101,104 @@ def show_video_line(data, ncols, vmax=0.6, vmin=0.0, cmap='gray', norm=None, cba
     plt.close()
 
 
-def show_video_gif_multiple(prev, true, pred, vmax=0.6, vmin=0.0, cmap='gray', norm=None, out_path=None, use_rgb=False):
-    """generate gif with a video sequence"""
+def show_video_gif_multiple(prev, true, pred, vmax=0.6, vmin=0.0, cmap='gray', norm=None,
+                           out_path=None, use_rgb=False):
+    """generate gif with a video sequence (prev | true vs pred)"""
 
     def swap_axes(x):
         if len(x.shape) > 3:
-            return x.swapaxes(1,2).swapaxes(2,3)
-        else: return x
+            x = x.swapaxes(1, 2).swapaxes(2, 3)  # -> (T, H, W, C)
+        # squeeze grayscale (H, W, 1) -> (H, W)
+        if x.ndim == 4 and x.shape[-1] == 1:
+            x = x[..., 0]
+        return x
 
     prev, true, pred = map(swap_axes, [prev, true, pred])
+
     prev_frames = prev.shape[0]
-    frames = prev_frames + true.shape[0]
+    total_frames = prev_frames + true.shape[0]
     images = []
-    for i in range(frames):
+
+    for i in range(total_frames):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(9, 6))
-        for t, ax in enumerate(axes):
-            if t == 0:
-                plt.text(0.3, 1.05, 'ground truth', fontsize=15, color='green', transform=ax.transAxes)
-                if i < prev_frames:
-                    if use_rgb:
-                        im = ax.imshow(cv2.cvtColor(prev[i], cv2.COLOR_BGR2RGB))
-                    else:
-                        im = ax.imshow(prev[i], cmap=cmap, norm=norm)
-                else:
-                    if use_rgb:
-                        im = ax.imshow(cv2.cvtColor(true[i-frames], cv2.COLOR_BGR2RGB))
-                    else:
-                        im = ax.imshow(true[i-frames], cmap=cmap, norm=norm)
-            elif t == 1:
-                plt.text(0.2, 1.05, 'predicted frames', fontsize=15, color='red', transform=ax.transAxes)
-                if i < prev_frames:
-                    if use_rgb:
-                        im = ax.imshow(cv2.cvtColor(prev[i], cv2.COLOR_BGR2RGB))
-                    else:
-                        im = ax.imshow(prev[i], cmap=cmap, norm=norm)
-                else:
-                    if use_rgb:
-                        im = ax.imshow(cv2.cvtColor(pred[i-frames], cv2.COLOR_BGR2RGB))
-                    else:
-                        im = ax.imshow(pred[i-frames], cmap=cmap, norm=norm)
-            ax.axis('off')
-            im.set_clim(vmin, vmax)
+
+        # LEFT: GT (prev then true)
+        ax = axes[0]
+        plt.text(0.3, 1.05, 'ground truth', fontsize=15, color='green', transform=ax.transAxes)
+        if i < prev_frames:
+            frame = prev[i]
+        else:
+            frame = true[i - prev_frames]
+        if use_rgb and frame.ndim == 3:
+            im = ax.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        else:
+            im = ax.imshow(frame, cmap=cmap, norm=norm)
+        ax.axis('off')
+        im.set_clim(vmin, vmax)
+
+        # RIGHT: Pred (prev then pred)
+        ax = axes[1]
+        plt.text(0.2, 1.05, 'predicted frames', fontsize=15, color='red', transform=ax.transAxes)
+        if i < prev_frames:
+            frame = prev[i]
+        else:
+            frame = pred[i - prev_frames]
+        if use_rgb and frame.ndim == 3:
+            im = ax.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        else:
+            im = ax.imshow(frame, cmap=cmap, norm=norm)
+        ax.axis('off')
+        im.set_clim(vmin, vmax)
+
         plt.savefig('./tmp.png', bbox_inches='tight', format='png')
         images.append(imageio.imread('./tmp.png'))
-    plt.close()
-    os.remove('./tmp.png')
+        plt.close()
+        os.remove('./tmp.png')
 
     if out_path is not None:
-        if not out_path.endswith('gif'):
-            out_path = out_path + '.gif'
+        if not out_path.endswith(".gif"):
+            out_path = out_path + ".gif"
         imageio.mimsave(out_path, images)
 
 
-def show_video_gif_single(data, out_path=None, use_rgb=False):
-    """generate gif with a video sequence"""
-    images = []
+def show_video_gif_single(data, out_path=None, use_rgb=False, fps=6):
+    """generate gif with a video sequence
+
+    Accepts:
+      - (T, C, H, W)  (OpenSTL default)
+      - (T, H, W, C)
+      - (T, H, W)    (grayscale)
+    Writes uint8 GIF and handles C==1 correctly.
+    """
+    # to (T, H, W, C) if needed
     if len(data.shape) > 3:
-        data=data.swapaxes(1, 2).swapaxes(2, 3)
+        data = data.swapaxes(1, 2).swapaxes(2, 3)
+
+    # squeeze single-channel: (T, H, W, 1) -> (T, H, W)
+    if data.ndim == 4 and data.shape[-1] == 1:
+        data = data[..., 0]
+
+    # float -> uint8
+    if np.issubdtype(data.dtype, np.floating):
+        # most OpenSTL saves are in [0, 1]
+        if np.nanmax(data) <= 1.0 + 1e-6:
+            data = data * 255.0
+        data = np.nan_to_num(data, nan=0.0, posinf=255.0, neginf=0.0)
+
+    data = np.clip(data, 0, 255).astype(np.uint8)
 
     images = []
     for i in range(data.shape[0]):
-        if use_rgb:
-            data[i] = cv2.cvtColor(data[i], cv2.COLOR_BGR2RGB)
-        image = imageio.core.util.Array(data[i])
-        images.append(image)
+        frame = data[i]
+        # only convert if it's actually 3-channel
+        if use_rgb and frame.ndim == 3 and frame.shape[-1] == 3:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        images.append(frame)
 
     if out_path is not None:
-        if not out_path.endswith('gif'):
-            out_path = out_path + '.gif'
-        imageio.mimsave(out_path, images)
+        if not out_path.endswith(".gif"):
+            out_path = out_path + ".gif"
+        imageio.mimsave(out_path, images, duration=1.0 / float(fps))
 
 
 def show_heatmap_on_image(img: np.ndarray,

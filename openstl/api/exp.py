@@ -14,6 +14,14 @@ from openstl.utils import (get_dataset, measure_throughput, SetupCallback, Epoch
 from lightning import seed_everything, Trainer
 import lightning.pytorch.callbacks as lc
 
+def strip_prefix(sd, prefixes=("model.", "module.")):
+    out = {}
+    for k, v in sd.items():
+        for p in prefixes:
+            if k.startswith(p):
+                k = k[len(p):]
+        out[k] = v
+    return out
 
 class BaseExperiment(object):
     """The basic class of PyTorch training and evaluation."""
@@ -39,11 +47,14 @@ class BaseExperiment(object):
         self.trainer = self._init_trainer(self.args, callbacks, strategy)
 
     def _init_trainer(self, args, callbacks, strategy):
+        if args.device == "cpu":
+            print("WARNING, I AM DOING 10 BATCHES ONLY IN HERE FOR CPU TESTING ")
+            return Trainer(accelerator="cpu", devices=1, max_epochs=args.epoch, callbacks=callbacks, limit_test_batches=4)
         return Trainer(devices=args.gpus,  # Use these GPUs
                        max_epochs=args.epoch,  # Maximum number of epochs to train for
                        strategy=strategy,   # 'ddp', 'deepspeed_stage_2', 'ddp_find_unused_parameters_false'
-                       accelerator='gpu',  # Use distributed data parallel
-                       callbacks=callbacks
+                       accelerator="cuda",  # Use distributed data parallel
+                       callbacks=callbacks,
                     )
 
     def _load_callbacks(self, args, save_dir, ckpt_dir):
@@ -94,9 +105,15 @@ class BaseExperiment(object):
         self.trainer.fit(self.method, self.data, ckpt_path=self.args.ckpt_path if self.args.ckpt_path else None)
 
     def test(self):
-        if self.args.test == True:
-            ckpt = torch.load(osp.join(self.save_dir, 'checkpoints', 'best.ckpt'))
-            self.method.load_state_dict(ckpt['state_dict'])
+        if getattr(self.args, "ckpt_path", None):
+            sd = torch.load(self.args.ckpt_path, map_location="cpu")
+            sd = {f"model.{k}": v for k, v in sd.items()}
+            self.method.load_state_dict(sd, strict=True)
+
+        elif self.args.test == True:
+            ckpt = torch.load(osp.join(self.save_dir, "checkpoints", "best.ckpt"), map_location="cpu")
+            self.method.load_state_dict(ckpt["state_dict"], strict=False)
+
         self.trainer.test(self.method, self.data)
     
     def display_method_info(self, args):

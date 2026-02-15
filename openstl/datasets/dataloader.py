@@ -23,13 +23,17 @@ def load_data(dataname, batch_size, val_batch_size, num_workers, data_root, dist
     elif 'kth' in dataname:  # 'kth', 'kth20', 'kth40'
         from .dataloader_kth import load_data
         return load_data(batch_size, val_batch_size, data_root, num_workers, **cfg_dataloader)
-    elif dataname in ['mmnist', 'mfmnist', 'mmnist_cifar']:  # 'mmnist', 'mfmnist', 'mmnist_cifar'
-        from .dataloader_moving_mnist import load_data
-        cfg_dataloader['data_name'] = kwargs.get('data_name', 'mnist')
+    elif 'nonlinearmmnist' in dataname:
+        from .dataloader_mmnist_nonlinear import load_data
         return load_data(batch_size, val_batch_size, data_root, num_workers, **cfg_dataloader)
     elif 'noisymmnist' in dataname:  # 'mmnist - perceptual', 'mmnist - missing', 'mmnist - dynamic' 
         from .dataloader_noisy_moving_mnist import load_data
+        print("TRIGGERETED NOISY")
         cfg_dataloader['noise_type'] = kwargs.get('noise_type', 'perceptual')
+        return load_data(batch_size, val_batch_size, data_root, num_workers, **cfg_dataloader)
+    elif dataname in ['mmnist', 'mfmnist', 'mmnist_cifar']:  # 'mmnist', 'mfmnist', 'mmnist_cifar'
+        from .dataloader_moving_mnist import load_data
+        cfg_dataloader['data_name'] = kwargs.get('data_name', 'mnist')
         return load_data(batch_size, val_batch_size, data_root, num_workers, **cfg_dataloader)
     elif 'kinetics' in dataname:  # 'kinetics400', 'kinetics600'
         from .dataloader_kinetics import load_data
